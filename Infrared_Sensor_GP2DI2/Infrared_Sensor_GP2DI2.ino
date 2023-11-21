@@ -1,30 +1,38 @@
-//Not tested due to breakage of the input output cable
-char GP2D12;
-char a, b;
+/*SHARP GP2Y0A21YK0F IR distance sensor with Arduino and SharpIR library example code. More info: https://www.makerguides.com */
+
+// Include the library:
+#include 
+
+// Define model and input pin:
+#define IRPin A0
+#define model 1080
+
+// Create variable to store the distance:
+int distance_cm;
+
+/* Model :
+  GP2Y0A02YK0F --> 20150
+  GP2Y0A21YK0F --> 1080
+  GP2Y0A710K0F --> 100500
+  GP2YA41SK0F --> 430
+*/
+
+// Create a new instance of the SharpIR class:
+SharpIR mySensor = SharpIR(IRPin, model);
 
 void setup() {
+  // Begin serial communication at a baudrate of 9600:
   Serial.begin(9600);
 }
 
 void loop() {
-  int val;
-  GP2D12 = read_gp2d12_range(A5);
-  a = GP2D12 / 10;
-  b = GP2D12;
-  val = a * 10 + b;
-  if (val > 10 && val < 80) {
-    Serial.print("Distancia: ");
-    Serial.print(a, DEC);
-    Serial.println(" cm");
-  } else {
-    Serial.println("Fuera de rango");
-  }
-  delay(50);
-}
+  // Get a distance measurement and store it as distance_cm:
+  distance_cm = mySensor.distance();
 
-float read_gp2d12_range(byte pin) {
-  int tmp;
-  tmp = analogRead(pin);
-  if (tmp < 3) return -1;
-  return (6787.0 / ((float)tmp - 3.0)) - 4.0;
+  // Print the measured distance to the serial monitor:
+  Serial.print("Mean distance: ");
+  Serial.print(distance_cm);
+  Serial.println(" cm");
+
+  delay(1000);
 }

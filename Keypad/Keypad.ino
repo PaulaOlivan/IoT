@@ -1,12 +1,16 @@
-const int keyVals[16] = {195, 248, 515, 642, 160, 221, 496, 629, 267, 320, 563, 682, 109, 166, 468, 605};
+const int keyVals[16] = {782, 795, 886, 937,
+                         158, 208, 484, 610,
+                         257, 300, 542, 656,
+                         104, 156, 452, 583};
 const char keys[16] = {'1', '2', '3', 'A', '4', '5', '6', 'B', '7', '8', '9', 'C', '*', '0', '#', 'D'};
-int range = 2; // Tolerancia arriba o abajo del valor numérico
+int range = 10; // Tolerancia arriba o abajo del valor numérico
 int lastButton = -1; // Último botón presionado
 unsigned long lastPressTime = 0; // Último momento en el que se presionó un botón
 bool buttonReleased = true; // Indica si el botón fue liberado
 
 void setup() {
   Serial.begin(9600); // Inicializa la comunicación serial
+  meanVoltage();
 }
 
 void loop() {
@@ -40,7 +44,7 @@ int detectButton(int inputValue) {
   return -1; // Si no se detecta ningún botón, devuelve -1
 }
 
-void obtenerVoltajeMedioTecla() {
+void meanVoltage() {
   Serial.println("Obteniendo voltaje medio de cada tecla...");
 
   for (int i = 0; i < 100; i++) {
