@@ -8,7 +8,7 @@ void setup() {
 
 void loop() {
   int val;
-  GP2D12 = read_gp2d12_range(0);
+  GP2D12 = read_gp2d12_range(A5);
   a = GP2D12 / 10;
   b = GP2D12;
   val = a * 10 + b;
