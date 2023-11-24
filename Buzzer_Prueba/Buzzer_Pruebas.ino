@@ -1,6 +1,6 @@
 // Definición de pines
 const int buzzerPin = 9; // Pin al que está conectado el buzzer
-int intruso = 1; // Variable para controlar los tonos del buzzer
+int intruso = 3; // Variable para controlar los tonos del buzzer
 
 void setup() {
   pinMode(buzzerPin, OUTPUT); // Configurar el pin del buzzer como salida
