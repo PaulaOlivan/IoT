@@ -36,7 +36,7 @@ void loop() {
     Serial.print(distance);
     Serial.println(" cm");
     wall = distance;
-    Serial.print("New wall measure = ");
+    Serial.print("New wall measure = "); // Update the wall measure
     Serial.print(wall);
     Serial.println(" cm");
   }
