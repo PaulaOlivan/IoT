@@ -1,0 +1,19 @@
+All the values has a tolerance up and down of 5. The keys are the numbers between 0-9 and the letter 'D'. The 'D' will act as the enter key.
+VALUES:
+1-> (810, 806, 810, 809, 810) -> 809
+2-> (827, 826, 828, 824, 828) -> 827
+3-> (926, 923, 925, 920, 924) -> 924
+4-> (166, 180, 162, 164, 164) -> 167
+5-> (220, 219, 219, 220, 218) -> 219
+6-> (503, 501, 503, 505, 503) -> 503
+7-> (267, 267, 268, 274, 267) -> 269
+8-> (312, 313, 313, 314, 314) -> 313
+9-> (565, 564, 562, 558, 563) -> 562
+0-> (164, 165, 167, 166, 167) -> 166
+D-> (952, 945, 945, 945, 949) -> 947
+
+Like the 0 and 4 are to close, the R4 resistor has been changes because only affects 0 and D keys, from 100 Ohms to 3.3 KOhms. The new 0 values are:
+0-> (648, 646, 648, 646, 647) -> 647
+D-> (997, 992, 993, 993, 994) -> 994
+
+The 4,5 and D keys work a little poorly and have to be pressed several times until they are detected.
