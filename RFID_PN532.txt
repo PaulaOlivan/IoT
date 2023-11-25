@@ -1,0 +1,38 @@
+The basic operation code for the buzzer is located in the folder named ArduinoCode/Buzzer on OneDrive. It is also included in this document.
+
+
+- CODE:
+
+The text provided below has been programmed in Python, as indicated by the tool specified in the manufacturer's documentation of the RFID detector.
+
+import board
+import busio
+from digitalio import DigitalInOut
+from adafruit_pn532.i2c import PN532_I2C
+reset_pin = DigitalInOut(board.D6)
+
+i2c = busio.I2C(board.SCL, board.SDA)
+pn532 = PN532_I2C(i2c, debug=False, reset=reset_pin, req=req_pin)
+
+ic, ver, rev, support = pn532.firmware_version
+print('Found PN532 with firmware version: {0}.{1}'.format(ver, rev))
+
+pn532.SAM_configuration()
+while True:
+    uid = pn532.read_passive_target(timeout=0.5)
+    print('.', end="", flush=True)
+    if uid is None:
+        continue
+    print('Found card with UID:', [hex(i) for i in uid])
+
+
+- TEST:
+
+To test the code, which detects the NFC device brought close to the sensor and displays it on the screen, both cards available in the lab kit have been tested near the sensor to ensure they are consistently read accurately.
+
+
+- PROBLEMS AND SOLUTIONS:
+
+The main issue encountered pertains to the available documentation for the sensor model, as there is limited code available online. Progress in this area becomes challenging as it requires knowledge of Python and familiarity with the library provided by the company. 
+
+There have also been occasional issues when reading the cards, as there have been instances where the values of some read cards have varied without apparent reason. Reviewing the documentation suggests that this might be due to improper card placement or movement in the connections with the breadboard, as these connections are not perfect and can experience fluctuations.

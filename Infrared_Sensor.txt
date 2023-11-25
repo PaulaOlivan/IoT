@@ -1,0 +1,37 @@
+The basic operation code for the buzzer is located in the folder named ArduinoCode/Infrared_Sensor_GP2D12 on OneDrive. It is also included in this document.
+
+
+- CODE:
+const int sensorPin = A0; // Analog pin connected to the sensor
+
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  int sensorValue = analogRead(sensorPin); // Read the analog value from the sensor
+  
+  // Convert the analog value to distance (in centimeters)
+  float voltage = sensorValue * (3.3 / 1023.0); // Convert the sensor reading to voltage
+  float distance = 13.0 * pow(voltage, -1.0); // Formula to convert voltage to distance
+  
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+
+  delay(500); // Wait for a short duration before taking the next reading
+}
+
+
+- TEST:
+
+To verify the sensor's functionality, an initial attempt was made to monitor it in a regular room by observing the values it detected when objects were moved in front of it. However, this approach proved ineffective because the sensor detected significant fluctuations in the presence of light. Therefore, an alternative method was attempted.
+
+The code was modified to perform 5 readings with the lights off, aiming to obtain more stable sensor readings. This procedure allowed for an average value to be derived for the room, enabling the detection of intrusion if an intruder were to turn on the room's lights.
+
+
+- PROBLEMS AND SOLUTIONS:
+
+The first issue encountered was that, most likely due to interference, the sensor does not accurately read the values it detects, thus making it unable to measure distances as initially intended. This problem has not been resolved, although an alternative solution has been explored and explained in the "TEST" section.
+
+The second issue, related to the previous one, occurs when the sensor registers fluctuations in readings even with the lights off, causing the intruder alarm to trigger without any actual variations. So far, this problem has not been resolved, but attempts will be made to address it by using a level-shifter or by replacing the infrared sensor to rule out potential issues caused by the current sensor's wiring. For the moment, the code had been adapted to work on a 3'3V board.

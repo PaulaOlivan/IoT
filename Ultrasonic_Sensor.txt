@@ -1,3 +1,7 @@
+The basic operation code for the buzzer is located in the folder named ArduinoCode/Ultrasonic_Sensor_HC-SR04 on OneDrive. It is also included in this document.
+
+
+- CODE:
 const int triggerPin = 9;
 const int echoPin = 10;
 float pulse_width, distance;
@@ -43,3 +47,15 @@ void loop() {
 
   delay(3000);
 }
+
+
+- TEST:
+
+To verify the demo code's functionality, a large object was placed at a fixed distance for the sensor to detect and assign as the "wall" variable. Once this variable was set, another object was placed in between or the first object was moved away to test for intruder detection. Upon intruder detection, it was notified, and the "wall" variable was reassigned with the distance detected under the "intruder" variable.
+
+This testing was repeated several times and in various setups to ensure consistent detection of intruders at the appropriate times and to avoid incorrect detections.
+
+
+- PROBLEMS AND SOLUTIONS:
+
+No issues were encountered during the sensor programming, as there was substantial information available about it, and the foundational codes obtained produced sensible and reasonably stable readings, with variations of a few millimeters.

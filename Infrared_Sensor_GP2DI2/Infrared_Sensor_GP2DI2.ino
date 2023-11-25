@@ -70,7 +70,6 @@ float if_mean(){
   return (sum/5);
 }
 
-
 float read_gp2d12_range(byte pin){
   int tmp;
   tmp = analogRead(pin);
