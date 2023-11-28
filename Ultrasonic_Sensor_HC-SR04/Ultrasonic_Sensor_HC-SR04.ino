@@ -33,7 +33,7 @@ void loop() {
   distance = (pulse_width*.0343)/2; //measure in cm, divided by 2 cause sounds goes and comes back
   if (distance > (wall+range) || distance < (wall-range)){
     Serial.print("Intruder detected at = ");
-    Serial.print(distance);0
+    Serial.print(distance);
     Serial.println(" cm");
     wall = distance;
     Serial.print("New wall measure = "); // Update the wall measure
@@ -41,5 +41,5 @@ void loop() {
     Serial.println(" cm");
   }
 
-  delay(3000);
+  delay(1000);
 }

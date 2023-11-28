@@ -12,12 +12,21 @@ char pass[] = "52752766413729464236";
 const char* mqttServer = "test.mosquitto.org";  // Uses the Mosquitto public broker
 const int mqttPort = 1883;
 const char* mqttClientId = "mkr1010-client";
+
+const char* microwaveSensorTopic = "motionDetection/microwaveSensor";
+const char* esp32camTopic = "motionDetection/esp32cam";
 const char* ultrasonicSensorTopic = "motionDetection/ultrasonicSensor";
 const char* infraredSensorTopic = "motionDetection/infraredSensor";
 const char* keypadTopic = "motionDetection/keypad";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+int microwave = 0;
+int cam = 0;
+int ultrasonic = 0;
+int infrared = 0;
+int keypad = 0;
 
 // Variables for infrared sensor
 const int sensorPin = A0; // Analog pin connected to the sensor
@@ -55,7 +64,6 @@ void setup() {
   /** Setting Ultrasonic sensor **/
   pinMode(triggerPin, OUTPUT);
   pinMode(echoPin, INPUT);
-  Serial.begin(9600);
   digitalWrite(triggerPin, LOW);
   delayMicroseconds(2);
   us_wall = us_measure();
@@ -66,7 +74,7 @@ void setup() {
   /** Setting Keypad **/
 
   // Connect to Wi-Fi
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid, pass);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.println("Connecting to WiFi...");
@@ -100,7 +108,7 @@ void loop() {
   // Capture and send data if a key is pressed
   char key = keyPressed();
   if (key != -1){
-    client.publish(keypadTopic, key);
+    client.publish(keypadTopic, "key");
   }
 
   Serial.println("| MICROWAVE |    CAM    | ULTRASONIC|  INFRARED |   KEYPAD  |");
@@ -112,7 +120,7 @@ void loop() {
   infrared = 0;
   keypad = 0;
 
-  delay(100);
+  delay(1000);
 }
 
 float us_measure(){
@@ -121,12 +129,13 @@ float us_measure(){
   delayMicroseconds(10);
   digitalWrite(triggerPin, LOW);
   pulse_width = pulseIn(echoPin, HIGH);
-  us_wall = (pulse_width*.0343)/2; //measure in cm, divided by 2 cause sounds goes and comes back
+  float wall = (pulse_width*.0343)/2; //measure in cm, divided by 2 cause sounds goes and comes back
   
   Serial.print("Distance to the wall = ");
-  Serial.print(us_wall);
+  Serial.print(wall);
   Serial.println(" cm");
-  delay(500);
+
+  return wall;
 }
 
 bool ultrasonicMovement() {
@@ -139,7 +148,10 @@ bool ultrasonicMovement() {
   
   if (us_distance > (us_wall+us_range) || us_distance < (us_wall-us_range)){
     Serial.print("Intruder detected at = ");
-    Serial.print(distance);0
+    Serial.print(us_distance);
+    Serial.println(" cm");
+    Serial.print("Wall measure at = ");
+    Serial. print(us_wall);
     Serial.println(" cm");
     return true;
   }
@@ -150,11 +162,11 @@ bool ultrasonicMovement() {
 
 float if_measure(){
   float sum = 0.0;
-  for (i=0; i<5; i++){
+  for (int i=0; i<5; i++){
     int sensorValue = analogRead(sensorPin); // Read the analog value from the sensor
     float voltage = sensorValue * (3.3 / 1023.0); // Convert the sensor reading to voltage
     float distance = 13.0 * pow(voltage, -1.0); // Formula to convert voltage to distance
-    sum = sum + distance
+    sum = sum + distance;
   }
   sum = sum / 5;
   return sum;
@@ -188,7 +200,6 @@ int keyPressed(){
       lastButton = detectedButton;
       lastPressTime = currentTime;
       buttonReleased = false;
-      delay(100);
     }
   } 
   

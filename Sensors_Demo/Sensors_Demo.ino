@@ -7,7 +7,9 @@ float US_wall;
 float US_range = 5.0;
 
 // Variables for Infrared sensor 
-const int IF_Pin = A0; // Analog pin connected to the sensor
+const int ifPin = A0; // Analog pin connected to the sensor
+float light;
+float if_range = 50.0;
 
 // Variables for Keypad
 const int keyVals[16] = {809, 827, 924, 0, 
@@ -24,7 +26,7 @@ unsigned long lastPressTime = 0; // Último momento en el que se presionó un bo
 bool buttonReleased = true; // Indica si el botón fue liberado
 
 // Variables for Buzzer
-const int buzzer = 4; //buzzer to arduino digital pin 0
+const int buzzerPin = 4; //buzzer to arduino digital pin 0
 int intruder = 0;
 
 void setup() {
@@ -40,15 +42,18 @@ void setup() {
   delayMicroseconds(10);
   digitalWrite(triggerPin, LOW);
   pulse_width = pulseIn(echoPin, HIGH);
-  wall = (pulse_width*.0343)/2; //measure in cm, divided by 2 cause sounds goes and comes back
+  US_wall = (pulse_width*.0343)/2; //measure in cm, divided by 2 cause sounds goes and comes back
   Serial.print("Distance to the wall = ");
-  Serial.print(wall);
+  Serial.print(US_wall);
   Serial.println(" cm");
   delay(500);
 
   // Setup for the Buzzer
-  pinMode(buzzer, OUTPUT); // Set buzzer - pin 0 as an output
-  digitalWrite(buzzer, HIGH); // Deactivated the buzzer pin
+  pinMode(buzzerPin, OUTPUT); // Set buzzer - pin 0 as an output
+  digitalWrite(buzzerPin, HIGH); // Deactivated the buzzer pin
+
+  //Setup for the Infrared Sensor
+  light = lights_measure();
 
 }
 
@@ -58,33 +63,38 @@ void loop() {
   delayMicroseconds(10);
   digitalWrite(triggerPin, LOW);
   pulse_width = pulseIn(echoPin, HIGH);
-  distance = (pulse_width*.0343)/2; //measure in cm, divided by 2 cause sounds goes and comes back
-  if (distance > (wall+range) || distance < (wall-range)){
+  US_distance = (pulse_width*.0343)/2; //measure in cm, divided by 2 cause sounds goes and comes back
+  if (US_distance > (US_wall+US_range) || US_distance < (US_wall-US_range)){
     Serial.print("Intruder detected at ");
-    Serial.print(distance);0
+    Serial.print(US_distance);
     Serial.println(" cm");
-    wall = distance;
+    US_wall = US_distance;
     Serial.print("New wall measure: "); // Update the wall measure
-    Serial.print(wall);
+    Serial.print(US_wall);
     Serial.println(" cm");
   }
 
-  delay(3000);
-
-
-  // Infrared Sensore Demo
-  int IF_value = analogRead(IF_Pin); // Read the analog value from the sensor
+  // Infrared Sensore Demo //
+  int if_Value = analogRead(ifPin); // Read the analog value from the sensor
   
   // Convert the analog value to distance (in centimeters)
-  float IF_voltage = IF_value * (3.3 / 1023.0); // Convert the sensor reading to voltage
-  float IF_distance = 13.0 * pow(IF_voltage, -1.0); // Formula to convert voltage to distance
+  float voltage = if_Value * (3.3 / 1023.0); // Convert the sensor reading to voltage
+  float distance = 13.0 * pow(voltage, -1.0); // Formula to convert voltage to distance
   
   Serial.print("Distance: ");
-  Serial.print(IF_distance);
+  Serial.print(distance);
   Serial.println(" cm");
 
-  delay(500); // Wait for a short duration before taking the next reading
-
+  if (distance > (light+if_range) || distance < (light-if_range)){
+    Serial.print("Intruder detected at: ");
+    Serial.print(distance);
+    Serial.println(" cm");
+  }
+  else{
+    Serial.print("Normal measure: ");
+    Serial.print(distance);
+    Serial.println(" cm");
+  }
 
   //Keypad
     unsigned long currentTime = millis(); // Obtener el tiempo actual
@@ -114,14 +124,16 @@ void loop() {
   Serial.println(intruder);
   if (intruder == 1){
     Serial.println("Intruder detected");
-    activeAlarm();
+    activeAlarm(2); // The intruder value must change with the sensor active
   }
+
+  delay(1000);
 }
 
 // Function for the Keypad Demo
-int detectButton(int inputValue) {
+int detectButton (int inputValue) {
   for (int i = 0; i < 16; i++) {
-    if (inputValue >= keyVals[i] - range && inputValue <= keyVals[i] + range) {
+    if (inputValue >= keyVals[i] - KEY_range && inputValue <= keyVals[i] + KEY_range) {
       return i; // Return the pulsed key
       }
   }
@@ -130,31 +142,48 @@ int detectButton(int inputValue) {
 
 // Function for the Buzzer activation
 void activeAlarm(int intruderLevel){
-    tone(buzzer, 10);   // Send 1KHz sound signal...
+    tone(buzzerPin, 10);   // Send 1KHz sound signal...
     delay(1000);        // ...for 1 sec
-    noTone(buzzer);     // reset to get a new sound...
+    noTone(buzzerPin);     // reset to get a new sound...
     delay(1000);        // ...for 1sec
     
     if (intruderLevel == 1) {
       Serial.println("Level 1 intruder detected");
       tone(buzzerPin, 10); // Frecuencia para el tono más bajo
       delay(1000);        // ...for 1 sec
-      noTone(buzzer);     // reset to get a new sound...
+      noTone(buzzerPin);     // reset to get a new sound...
       delay(1000);        // ...for 1sec
     } 
     else if (intruderLevel == 2) {
       Serial.println("Level 2 intruder detected");
       tone(buzzerPin, 100); // Frecuencia para el tono medio
       delay(1000);        // ...for 1 sec
-      noTone(buzzer);     // reset to get a new sound...
+      noTone(buzzerPin);     // reset to get a new sound...
       delay(1000);        // ...for 1sec
     } 
     else if (intruderLevel == 3) {
       Serial.println("Level 3 intruder detected");
       tone(buzzerPin, 500); // Frecuencia para el tono más alto
       delay(1000);        // ...for 1 sec
-      noTone(buzzer);     // reset to get a new sound...
+      noTone(buzzerPin);     // reset to get a new sound...
       delay(1000);        // ...for 1sec
     }
     intruder = 0; // Restablecer la variable intruso a 0
+}
+
+// Function for measure the light in the room for the IF sensor
+float lights_measure(){
+
+  int sum = 0;
+  for (int i=0; i<5; i++){
+    int value = analogRead(ifPin);
+
+    float voltage = value * (3.3 / 1023.0);
+    float distance = 13.0 * pow(voltage, -1.0);
+
+    sum = sum + distance;
+  }
+  sum = sum / 5;
+  return sum;
+
 }
