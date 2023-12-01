@@ -1,7 +1,7 @@
 const int keyVals[16] = {809, 827, 924, 0, 
                          166, 219, 503, 0,
                          269, 313, 562, 0,
-                         0,   647, 0,   994};
+                         0,   647, 0,   0}; // 0 Acts like the enter key
 const char keys[16] = {'1', '2', '3', 'A', 
                        '4', '5', '6', 'B',
                        '7', '8', '9', 'C',
@@ -20,14 +20,20 @@ void loop() {
   unsigned long currentTime = millis(); // Obtener el tiempo actual
 
   int keyIn = analogRead(A1); // Read the keypad input
-  /*Serial.print ("A1 voltage: ");
-  Serial.println(keyIn);*/
+  Serial.print ("A1 voltage: ");
+  Serial.println(keyIn);
   int detectedButton = detectButton(keyIn); // Find with button is detected
 
   if (detectedButton != -1) {
     if (buttonReleased) {
+      if (keyIn < 1023.0){
+        Serial.print("A1 value: ");
+        Serial.println(keyIn);
+      }
       Serial.print("New key pulsed: ");
-      Serial.println(keys[detectedButton]); // Muestra el botón por el monitor serial
+      Serial.print(keys[detectedButton]); // Muestra el botón por el monitor serial
+      Serial.print(" | Voltage A1: ");
+      Serial.println(keyIn);
       lastButton = detectedButton;
       lastPressTime = currentTime; // Actualiza el tiempo del último botón pulsado
       buttonReleased = false; // Deshabilita la detección hasta que se libere el botón

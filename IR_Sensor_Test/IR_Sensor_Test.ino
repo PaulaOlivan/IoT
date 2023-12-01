@@ -1,36 +1,23 @@
-/*SHARP GP2Y0A21YK0F IR distance sensor with Arduino and SharpIR library example code. More info: https://www.makerguides.com */
+// Arduino Code to measure distance with a Sharp GP2D12 sensor
+// www.swanrobotics.com
 
-// Include the library:
-//#include SharpIR-master
+int IR_SENSOR = 0; // Sensor is connected to the analog A0
+int intSensorResult = 0; //Sensor result
+float fltSensorCalc = 0; //Calculated value
 
-char GP2D12;
-char a,b;
 void setup()
 {
- Serial.begin(9600); //
+Serial.begin(9600); // Setup communication with computer to present results serial monitor
 }
+
 void loop()
 {
- int val;
- GP2D12=read_gp2d12_range(0);
- Serial.print("Value: ");
- Serial.println(GP2D12);
- a=GP2D12/10;
- b=GP2D12%10;
- val=a*10+b;
- if(val>10&&val<80)
- {
-   Serial.print(a,DEC);//
-   Serial.print(b,DEC);//
-   Serial.println("cm");//
- }
- else Serial.println("over");//
- delay(3000);
-}
-float read_gp2d12_range(byte pin)
-{
- int tmp;
- tmp = analogRead(pin);
- if (tmp < 3)return -1;
- return (6787.0 /((float)tmp - 3.0)) - 4.0;
+// read the value from the ir sensor
+
+intSensorResult = analogRead(IR_SENSOR); //Get sensor value
+fltSensorCalc = (6787.0 / (intSensorResult - 3.0)) - 4.0; //Calculate distance in cm
+
+Serial.print(fltSensorCalc); //Send distance to computer
+Serial.println(" cm"); //Add cm to result
+delay(200); //Wait
 }

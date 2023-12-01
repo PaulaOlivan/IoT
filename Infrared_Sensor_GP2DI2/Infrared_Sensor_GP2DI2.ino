@@ -6,8 +6,8 @@
 // Wait a minute until take the value of the if sensor, we will take 5 values and compute the mean in the variable if_reference
 // If this value change up or down 50 the alarm will detected intrusion
 
-float GP2D12; //Used to be a char
-float a,b; // Used to be a char
+char GP2D12; //Used to be a char
+char a,b; // Used to be a char
 byte if_pin = A0;
 float wall;
 bool first = true;
@@ -63,14 +63,14 @@ void loop(){
 
 float if_mean(){
   int sum;
-  for (i=0; i<5; i++){
+  for (int i=0; i<5; i++){
     sum = sum + read_gp2d12_range(if_pin);
   }
   delay(1000); //Wait 1 sec before next reading
   return (sum/5);
 }
 
-float read_gp2d12_range(byte pin){
+float read_gp2d12_range(int pin){
   int tmp;
   tmp = analogRead(pin);
   Serial.print("tmp value: ");

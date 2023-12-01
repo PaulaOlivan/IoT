@@ -5,13 +5,14 @@ float wall;
 float range = 5.0;
 
 void setup() {
-  // put your setup code here, to run once:
+  Serial.println("Starting the sensor");
   pinMode(triggerPin, OUTPUT);
   pinMode(echoPin, INPUT);
   Serial.begin(9600);
   digitalWrite(triggerPin, LOW);
   delayMicroseconds(2);
 
+  Serial.println("Making first medition");
   // Distance to the wall
   digitalWrite(triggerPin, HIGH);
   delayMicroseconds(10);
@@ -41,5 +42,5 @@ void loop() {
     Serial.println(" cm");
   }
 
-  delay(1000);
+  delay(500);
 }
