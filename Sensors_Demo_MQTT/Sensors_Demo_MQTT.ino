@@ -2,10 +2,34 @@
 #include <SPI.h>
 #include <Adafruit_PN532.h>
 #include <Keypad.h>
+#include <WiFi101.h>
+#include <PubSubClient.h>
 
 #define PN532_IRQ   (2)
 #define PN532_RESET (3)  // Not connected by default on the NFC Shield
 
+/******** Variables for the MQTT server ********/
+//char ssid[] = "dlink";
+char ssid[] = "COSMOTE-166950";
+//char pass[] = "";
+char pass[] = "52752766413729464236";
+const char* mqttServer = "test.mosquitto.org";  // Uses the Mosquitto public broker
+const int mqttPort = 1883;
+const char* mqttClientId = "mkr1010-client";
+
+const char* microwaveSensorTopic = "motionDetection/microwaveSensor";
+const char* esp32camTopic = "motionDetection/esp32cam";
+const char* ultrasonicSensorTopic = "motionDetection/ultrasonicSensor";
+const char* infraredSensorTopic = "motionDetection/infraredSensor";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+int microwave = 0;
+int cam = 0;
+int ultrasonic = 0;
+
+/******** Variables for the RFID sensor ********/
 Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
 uint8_t storedUID[] = {0xC7, 0xFE, 0x66, 0x39};
 uint8_t storedUIDLength = sizeof(storedUID);
@@ -16,16 +40,15 @@ bool cardDetected = false;
 
 bool alarm = false; // false = non active || true = active
 int tries = 0;
-String password = "1234";
 
-// Variables for ultrasonic sensor
+/******** Variables for ultrasonic sensor ********/
 const int triggerPin = 9;
 const int echoPin = 10;
 float pulse_width, US_distance;
 float US_wall;
-float US_range = 5.0;
+float US_range = 10.0;
 
-// Variables for Keypad
+/******** Variables for the keypad ********/
 const byte ROWS = 4; //four rows
 const byte COLS = 4; //four columns
 
@@ -36,33 +59,51 @@ const char keys[ROWS][COLS] = {'1', '2', '3', 'A',
 
 byte rowPins[ROWS] = {14, 13, 8, 7}; //connect to the row pinouts of the keypad
 byte colPins[COLS] = {6, 2, 3, 5}; //connect to the column pinouts of the keypad
-//Create an object of keypad
-Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS); //Create an object of keypad
 
 const int passwdSize = 4;
 char inputPassword[passwdSize] = {'\0', '\0' , '\0', '\0'}; // Array to store the entered password
 const char storedPassword[passwdSize] = {'1', '9', '9', '1'}; // Stored password
 static int pos = 0;
 
-// Variables for Buzzer
+/******** Variables for the buzzer and LED ********/
 const int buzzerPin = 4; //buzzer to arduino digital pin 0
+const int ledPin = A5; 
 int intruder = 0;
 
+/*****************************************/
 void setup() {
 
   Serial.begin(9600);
   while (!Serial) delay(10);
   keypad.addEventListener(keypadEvent); //add an event listener for this keypad
-
+  
   // Setup for the Buzzer
-  pinMode(buzzerPin, OUTPUT); // Set buzzer - pin 0 as an output
+  pinMode(buzzerPin, OUTPUT); // Set buzzer - pin 4 as an output
   digitalWrite(buzzerPin, HIGH); // Deactivated the buzzer pin
+  pinMode(ledPin, OUTPUT); // Set led - pin A5 as an output
+  digitalWrite(ledPin, LOW);
 
   //Setup for the Ultrasonic Sensor
   pinMode(triggerPin, OUTPUT);
   pinMode(echoPin, INPUT);
   digitalWrite(triggerPin, LOW);
   delayMicroseconds(2);
+
+  // Attempt to connect to Wi-Fi
+  int status = WiFi.begin(ssid, pass);
+  while (status != WL_CONNECTED) {
+    Serial.println("Connecting to WiFi...");
+    delay(1000);
+    status = WiFi.begin(ssid, pass);
+  }
+  Serial.println("Connected to WiFi");
+
+  // MQTT setup
+  client.setServer(mqttServer, mqttPort);
+  client.setCallback(callback);
+  reconnect();
 
   nfc.begin();
 
@@ -77,10 +118,17 @@ void setup() {
   Serial.print('.'); Serial.println((versiondata>>8) & 0xFF, DEC);
 }
 
+/*****************************************/
 void loop() {
   //char key = keypad.getKey();// Read the key
+
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
   if (alarm == false){ // Alarm deactivated only reads the keypad and the sensor
-    for (int i=0; i<1000; i++){
+    //for (int i=0; i<1000; i++){
       readKeypad();
       if (inputPassword[passwdSize - 1] != '\0') {
         bool passwordsMatch = comparePasswords();
@@ -93,7 +141,7 @@ void loop() {
         }
         resetPassword();
       }
-    }
+    //}
     if (alarm == false){ //The alarm continues deactivated so read the RFID
       cardDetected = readRFID();
       if (cardDetected){
@@ -223,17 +271,21 @@ void alarmIncorrectTry(){
     intruderDetected();
   }
   else{
-    digitalWrite(buzzerPin, LOW);
-    delay(1500);
-    digitalWrite(buzzerPin, HIGH);
+    digitalWrite(buzzerPin, LOW); //turn on the buzzer
+    digitalWrite(ledPin, HIGH); // turn on the led
+    delay(100); //1500 antes
+    digitalWrite(buzzerPin, HIGH); //turn off the buzzer
+    digitalWrite(ledPin, LOW); // turn off the led
   }
 }
 
 void intruderDetected(){
   for (int i=0; i<10; i++){ //10 normal tones
       digitalWrite(buzzerPin, LOW);
+      digitalWrite(ledPin, HIGH);
       delay(150);
       digitalWrite(buzzerPin, HIGH);
+      digitalWrite(ledPin, LOW);
       delay(100);
   }
 }
@@ -247,7 +299,7 @@ void readUltrasonic(){
   US_distance = (pulse_width*.0343)/2;
 
   if (US_distance > (US_wall+US_range) || US_distance < (US_wall-US_range)){
-    Serial.print("Intruder detected at = ");
+    Serial.print("Intruder detected on the ultrasonic sensor at = ");
     Serial.print(US_distance);
     Serial.println(" cm");
     US_wall = US_distance;
@@ -255,7 +307,15 @@ void readUltrasonic(){
     Serial.print(US_wall);
     Serial.println(" cm");
     intruderDetected();
+    // Send the value to Andreas board
+    String temp = String(US_distance, 2); // 2 say how many decimals we want
+    client.publish(ultrasonicSensorTopic, temp.c_str());
   }
+
+  microwave = 0;
+  cam = 0;
+  ultrasonic = 0;
+
 }
 
 /********* Functions for the Keypad *********/
@@ -291,29 +351,43 @@ void keypadEvent(KeypadEvent eKey){
   switch (keypad.getState()){
   case PRESSED:
     Serial.println(eKey);
-  //   if (passwd_pos - 15 >= 5) { 
-  //     return ;
-  //   }
-  //   lcd.setCursor((passwd_pos++),0);
-  //   switch (eKey){
-  //   case '#':                 //# is to validate password 
-  //     passwd_pos  = 15;
-  //     checkPassword(); 
-  //     break;
-  //   case '*':                 //* is to reset password attempt
-  //     password.reset(); 
-  //     passwd_pos = 15;
-  //  // TODO:
-//     break;
-  //   default: 
-  //     password.append(eKey);
-  //     lcd.print("*");
-  //   }
   }
-  // Serial.print("Keypressed: ");
-  // Serial.println(eKey);
 }
 
+/****** Functions for the MQTT server ******/
+void reconnect() {
+  while (!client.connected()) {
+    Serial.println("Connecting to MQTT...");
+    if (client.connect(mqttClientId)) {
+      Serial.println("Connected to MQTT");
 
+      // Subscribe to specified topics
+      client.subscribe(microwaveSensorTopic);
+      client.subscribe(esp32camTopic);
+      client.subscribe(ultrasonicSensorTopic);
+    } else {
+      Serial.print("Failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" Retrying in 5 seconds...");
+      delay(5000);
+    }
+  }
+}
 
+void callback(char* topic, byte* payload, unsigned int length) {
 
+  if (String(topic).equals(String(microwaveSensorTopic))) {
+    microwave = 1;
+    Serial.println("Intruder detected on the microwave sensor");
+    intruderDetected(); 
+  } 
+  else if (String(topic).equals(String(esp32camTopic))) {
+    cam = 1;
+    Serial.println("Intruder detected on the camera");
+    intruderDetected();
+  } 
+  else if (String(topic).equals(String(ultrasonicSensorTopic))) {
+    ultrasonic = 1;
+    // Send to Andreas microcontroller
+  }
+}

@@ -7,8 +7,10 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 
-char ssid[] = "dlink";
-char pass[] = "";
+//char ssid[] = "dlink";
+char ssid[] = "COSMOTE-166950";
+//char pass[] = "";
+char pass[] = "52752766413729464236";
 const char* mqttServer = "test.mosquitto.org";  // Uses the Mosquitto public broker
 const int mqttPort = 1883;
 const char* mqttClientId = "mkr1010-client";
@@ -25,14 +27,13 @@ PubSubClient client(espClient);
 int microwave = 0;
 int cam = 0;
 int ultrasonic = 0;
-String keypad = "";
 
 /******* Variables for ultrasonic sensor *******/
 const int triggerPin = 9;
 const int echoPin = 10;
 float pulse_width, us_distance;
 float us_wall;
-float us_range = 1.0;
+float us_range = 10.0;
 
 
 /******* Variables for the keypad *******/
@@ -49,6 +50,7 @@ int lastButton = -1;
 unsigned long lastPressTime = 0;
 bool buttonReleased = true;
 
+int buzzerPin = 4;
 
 void setup() {
 
@@ -56,6 +58,8 @@ void setup() {
   delay(5000);//Time for user to open serial monitor on Arduino IDE
 
   //debug("INFO", "Init");
+  pinMode(buzzerPin, OUTPUT);
+  digitalWrite(buzzerPin, HIGH);
 
   /** Setting Ultrasonic sensor **/
   pinMode(triggerPin, OUTPUT);
@@ -104,12 +108,28 @@ void loop() {
   Serial.print("|     " + String(microwave) + "     |     " + String(cam));
   Serial.println("     |     " + String(us_distance) + "     |     " + String(keypad) +"     |");
 
+  if (microwave == 1){
+    intruderDetected();
+  }
+
+  if (cam == 1){
+    intruderDetected();
+  }
+
   microwave = 0;
   cam = 0;
   ultrasonic = 0;
-  keypad = "";
 
   delay(500);
+}
+
+void intruderDetected(){
+  for (int i=0; i<10; i++){ //10 normal tones
+      digitalWrite(buzzerPin, LOW);
+      delay(150);
+      digitalWrite(buzzerPin, HIGH);
+      delay(100);
+  }
 }
 
 float us_measure(){
@@ -150,38 +170,6 @@ bool ultrasonicMovement() {
   }
 }
 
-int keyPressed(){
-  unsigned long currentTime = millis(); // Obtener el tiempo actual
-
-  int keyIn = analogRead(A1); // Read the keypad input
-  int detectedButton = detectButton(keyIn); // Find with button is detected
-
-  if (detectedButton != -1) {
-    if (buttonReleased) {
-      Serial.print("New key pulsed: ");
-      Serial.println(keys[detectedButton]);
-      lastButton = detectedButton;
-      lastPressTime = currentTime;
-      buttonReleased = false;
-    }
-  } 
-  
-  else if (detectedButton == -1) {
-    buttonReleased = true;
-  }
-
-  return detectedButton;
-}
-
-int detectButton(int inputValue) {
-  for (int i = 0; i < 16; i++) {
-    if (inputValue >= keyVals[i] - key_range && inputValue <= keyVals[i] + key_range) {
-      return i;
-      }
-  }
-  return -1;
-}
-
 void reconnect() {
   while (!client.connected()) {
     Serial.println("Connecting to MQTT...");
@@ -213,3 +201,4 @@ void callback(char* topic, byte* payload, unsigned int length) {
     ultrasonic = 1;
   }
 }
+
