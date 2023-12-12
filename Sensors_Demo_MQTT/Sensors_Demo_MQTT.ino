@@ -1,18 +1,18 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_PN532.h>
+#include <WiFi.h>
 #include <Keypad.h>
-#include <WiFi101.h>
 #include <PubSubClient.h>
 
 #define PN532_IRQ   (2)
 #define PN532_RESET (3)  // Not connected by default on the NFC Shield
 
 /******** Variables for the MQTT server ********/
-//char ssid[] = "dlink";
-char ssid[] = "COSMOTE-166950";
-//char pass[] = "";
-char pass[] = "52752766413729464236";
+//char ssid[] = "COSMOTE-166950";
+//char pass[] = "52752766413729464236";
+char ssid[] = "dlink";
+char pass[] = "";
 const char* mqttServer = "test.mosquitto.org";  // Uses the Mosquitto public broker
 const int mqttPort = 1883;
 const char* mqttClientId = "mkr1010-client";
@@ -57,19 +57,19 @@ const char keys[ROWS][COLS] = {'1', '2', '3', 'A',
                                '7', '8', '9', 'C',
                                '*', '0', '#', 'D'};
 
-byte rowPins[ROWS] = {14, 13, 8, 7}; //connect to the row pinouts of the keypad
-byte colPins[COLS] = {6, 2, 3, 5}; //connect to the column pinouts of the keypad
+byte rowPins[ROWS] = {A0, A1, A2, A3}; //connect to the row pinouts of the keypad
+byte colPins[COLS] = {2, 3, 4, 5}; //connect to the column pinouts of the keypad
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS); //Create an object of keypad
 
 const int passwdSize = 4;
 char inputPassword[passwdSize] = {'\0', '\0' , '\0', '\0'}; // Array to store the entered password
 const char storedPassword[passwdSize] = {'1', '9', '9', '1'}; // Stored password
-static int pos = 0;
+static int pos = 0; 
 
 /******** Variables for the buzzer and LED ********/
-const int buzzerPin = 4; //buzzer to arduino digital pin 0
-const int ledPin = A5; 
+const int buzzerPin = 7; //buzzer to arduino digital pin 6
+const int ledPin = A6; 
 int intruder = 0;
 
 /*****************************************/
@@ -80,7 +80,7 @@ void setup() {
   keypad.addEventListener(keypadEvent); //add an event listener for this keypad
   
   // Setup for the Buzzer
-  pinMode(buzzerPin, OUTPUT); // Set buzzer - pin 4 as an output
+  pinMode(buzzerPin, OUTPUT); // Set buzzer - pin D6 as an output
   digitalWrite(buzzerPin, HIGH); // Deactivated the buzzer pin
   pinMode(ledPin, OUTPUT); // Set led - pin A5 as an output
   digitalWrite(ledPin, LOW);
@@ -91,12 +91,11 @@ void setup() {
   digitalWrite(triggerPin, LOW);
   delayMicroseconds(2);
 
-  // Attempt to connect to Wi-Fi
-  int status = WiFi.begin(ssid, pass);
-  while (status != WL_CONNECTED) {
-    Serial.println("Connecting to WiFi...");
+  // Connect to Wi-Fi
+  WiFi.begin(ssid, pass);
+  while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
-    status = WiFi.begin(ssid, pass);
+    Serial.println("Connecting to WiFi...");
   }
   Serial.println("Connected to WiFi");
 
@@ -128,20 +127,7 @@ void loop() {
   client.loop();
 
   if (alarm == false){ // Alarm deactivated only reads the keypad and the sensor
-    //for (int i=0; i<1000; i++){
-      readKeypad();
-      if (inputPassword[passwdSize - 1] != '\0') {
-        bool passwordsMatch = comparePasswords();
-        if (passwordsMatch) {
-          Serial.println("Password validated, alarm activated");
-          activateAlarm();
-        } else {
-          Serial.println("Incorrect password, try again");
-          alarmIncorrectTry();
-        }
-        resetPassword();
-      }
-    //}
+    readKeypad(0); // 0 If the alarm is deactivated
     if (alarm == false){ //The alarm continues deactivated so read the RFID
       cardDetected = readRFID();
       if (cardDetected){
@@ -156,21 +142,11 @@ void loop() {
       }
     }
   }
+ 
   else{ // The alarm is active
     readUltrasonic();
     // Lets see if the alarm turn off
-    readKeypad();
-    if (inputPassword[passwdSize - 1] != '\0') {
-      bool passwordsMatch = comparePasswords();
-      if (passwordsMatch) {
-        desactivateAlarm();
-        Serial.println("Password validated, alarm desactivated");
-      } else {
-        alarmIncorrectTry();
-        Serial.println("Incorrect password, try again");
-      }
-      resetPassword();
-    }
+    readKeypad(1); // 1 if the alarm is actived
     if (alarm == true){ //The alarm continues activated so read the RFID
       cardDetected = readRFID();
       if (cardDetected){
@@ -187,35 +163,38 @@ void loop() {
   }
 }
 
-/****** Functions related to turning the alarm on and off ******/
-void readKeypad() {
+/****** Functions related to turning the alarm on and off ******/ 
+void readKeypad(int alarmValue) {
   char key = keypad.getKey();// Read the key
   // Print if key pressed
   if (key){
-    Serial.print("Key Pressed : ");
-    Serial.println(key);
     digitalWrite(buzzerPin, LOW); // Activate the passive buzzer
     delay(250); // Wait for a short duration
     digitalWrite(buzzerPin, HIGH); // Turn off the buzzer
 
     // Store the detected button in the password array
-    storePassword(key);
+    if (key != 'A'){
+      storePassword(key);
+    }
+    else{
+      comparePasswords(alarmValue);
+    }
   }
 
   if (key == 'D'){
     resetPassword();
   }
-}
+} 
 
 bool readRFID() {
   success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 100); //Dont move the timeout
   if (success) {
-    Serial.println("Found an ISO14443A card");
+    /*Serial.println("Found an ISO14443A card");
     // Display UID information
     Serial.print("  UID Length: "); Serial.print(uidLength, DEC); Serial.println(" bytes");
     Serial.print("  UID Value: ");
     nfc.PrintHex(uid, uidLength);
-    Serial.println("");
+    Serial.println("");*/
     return true;
   }
   else{
@@ -228,26 +207,24 @@ void activateAlarm(){
   alarm = true;
   tries = 0; //Reset tries if we active the alarm
   digitalWrite(buzzerPin, LOW); // 1 large tone
+  digitalWrite(ledPin, HIGH);
   delay(500);
   digitalWrite(buzzerPin, HIGH);
+  digitalWrite(ledPin, LOW);
   delay(100);
   for (int i=0; i<2; i++){ //2 normal tones
     digitalWrite(buzzerPin, LOW);
+    digitalWrite(ledPin, HIGH);
     delay(150);
     digitalWrite(buzzerPin, HIGH);
+    digitalWrite(ledPin, LOW);
     delay(100);
   }
 
   // Read the Ultrasonic sensor to measure the initial wall
-  Serial.println("Initializing the ultrasonic sensor");
-  digitalWrite(triggerPin, HIGH);   // Distance to the wall
-  delayMicroseconds(10);
-  digitalWrite(triggerPin, LOW);
-  pulse_width = pulseIn(echoPin, HIGH);
-  US_wall = (pulse_width*.0343)/2; //measure in cm, divided by 2 cause sounds goes and comes back
-  Serial.print("Measured distance ");
-  Serial.print(US_wall);
-  Serial.println(" cm");
+  startUltrasonic();
+  // Read the Infrared sensor to measure the initial wall
+  
 }
 
 void desactivateAlarm(){
@@ -255,13 +232,17 @@ void desactivateAlarm(){
   tries = 0;
   for (int i=0; i<2; i++){ //2 normal tones
     digitalWrite(buzzerPin, LOW);
+    digitalWrite(ledPin, HIGH);
     delay(150);
     digitalWrite(buzzerPin, HIGH);
+    digitalWrite(ledPin, LOW);
     delay(100);
   }
   digitalWrite(buzzerPin, LOW); // 1 large tone
+  digitalWrite(ledPin, HIGH);
   delay(500);
   digitalWrite(buzzerPin, HIGH);
+  digitalWrite(ledPin, LOW);
   delay(100);
 }
 
@@ -273,7 +254,7 @@ void alarmIncorrectTry(){
   else{
     digitalWrite(buzzerPin, LOW); //turn on the buzzer
     digitalWrite(ledPin, HIGH); // turn on the led
-    delay(100); //1500 antes
+    delay(1500);
     digitalWrite(buzzerPin, HIGH); //turn off the buzzer
     digitalWrite(ledPin, LOW); // turn off the led
   }
@@ -291,6 +272,18 @@ void intruderDetected(){
 }
 
 /********* Functions for detect intruder *********/
+void startUltrasonic(){
+  Serial.println("Initializing the ultrasonic sensor");
+  digitalWrite(triggerPin, HIGH);   // Distance to the wall
+  delayMicroseconds(10);
+  digitalWrite(triggerPin, LOW);
+  pulse_width = pulseIn(echoPin, HIGH);
+  US_wall = (pulse_width*.0343)/2; //measure in cm, divided by 2 cause sounds goes and comes back
+  Serial.print("Ultrasonic distance ");
+  Serial.print(US_wall);
+  Serial.println(" cm");
+}
+
 void readUltrasonic(){
   digitalWrite(triggerPin, HIGH); 
   delayMicroseconds(10);
@@ -320,23 +313,42 @@ void readUltrasonic(){
 
 /********* Functions for the Keypad *********/
 void storePassword(char key) {
-  if (pos < passwdSize) {
+  /*if (pos < passwdSize) {
     inputPassword[pos++] = key;
-  }
+  }*/
+  
+  inputPassword[0] = inputPassword[1];
+  inputPassword[1] = inputPassword[2];
+  inputPassword[2] = inputPassword[3];
+  inputPassword[3] = key;
+  
 }
 
-bool comparePasswords() {
+void comparePasswords(int alarmValue) {
+  bool pass_equal = true;
   for (int i = 0; i < passwdSize; i++) {
-    Serial.print(i);
+    /*Serial.print(i);
     Serial.print(": input -> ");
     Serial.print(inputPassword[i]);
     Serial.print(" | stored -> ");
-    Serial.println(storedPassword[i]);
+    Serial.println(storedPassword[i]);*/
     if (inputPassword[i] != storedPassword[i]) {
-      return false;
+        pass_equal = false;
     }
   }
-  return true;
+  if (pass_equal && alarmValue == 0) {
+    Serial.println("Password validated, alarm activated");
+    activateAlarm();
+  }
+  else if (pass_equal && alarmValue == 1){
+    Serial.println("Password validated, alarm desactivated");
+    desactivateAlarm();
+  }
+  else {
+    Serial.println("Incorrect password, try again");
+    alarmIncorrectTry();
+  }
+  resetPassword();
 }
 
 void resetPassword() {
@@ -352,7 +364,7 @@ void keypadEvent(KeypadEvent eKey){
   case PRESSED:
     Serial.println(eKey);
   }
-}
+} 
 
 /****** Functions for the MQTT server ******/
 void reconnect() {
@@ -378,13 +390,17 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   if (String(topic).equals(String(microwaveSensorTopic))) {
     microwave = 1;
-    Serial.println("Intruder detected on the microwave sensor");
-    intruderDetected(); 
+    if (alarm == true) { //The alarm is activated
+      Serial.println("Intruder detected on the microwave sensor");
+      intruderDetected();
+    } 
   } 
   else if (String(topic).equals(String(esp32camTopic))) {
     cam = 1;
-    Serial.println("Intruder detected on the camera");
-    intruderDetected();
+    if(alarm == true){
+      Serial.println("Intruder detected on the camera");
+      intruderDetected();
+    }
   } 
   else if (String(topic).equals(String(ultrasonicSensorTopic))) {
     ultrasonic = 1;

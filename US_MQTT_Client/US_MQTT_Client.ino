@@ -7,10 +7,10 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 
-//char ssid[] = "dlink";
-char ssid[] = "COSMOTE-166950";
-//char pass[] = "";
-char pass[] = "52752766413729464236";
+char ssid[] = "dlink";
+//char ssid[] = "COSMOTE-166950";
+char pass[] = "";
+//char pass[] = "52752766413729464236";
 const char* mqttServer = "test.mosquitto.org";  // Uses the Mosquitto public broker
 const int mqttPort = 1883;
 const char* mqttClientId = "mkr1010-client";
@@ -96,17 +96,9 @@ void loop() {
     client.publish(ultrasonicSensorTopic, temp.c_str());
   }
 
-  // Capture and send data if a key is pressed
-  int index_key = keyPressed();
-  if (index_key != -1){
-    String temp = String(keys[index_key]);
-    client.publish(keypadTopic, temp.c_str());
-    keypad = temp;
-  }
-
   Serial.println("| MICROWAVE |    CAM    | ULTRASONIC|   KEYPAD  |");
   Serial.print("|     " + String(microwave) + "     |     " + String(cam));
-  Serial.println("     |     " + String(us_distance) + "     |     " + String(keypad) +"     |");
+  Serial.println("     |     " + String(us_distance) + "     |     ");
 
   if (microwave == 1){
     intruderDetected();
