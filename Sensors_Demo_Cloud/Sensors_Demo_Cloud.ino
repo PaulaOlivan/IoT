@@ -139,7 +139,7 @@ void setup() {
   client.setCallback(callback);
   reconnect();
 
-  nfc.begin();
+  /*nfc.begin();
 
   uint32_t versiondata = nfc.getFirmwareVersion();
   if (! versiondata) {
@@ -149,7 +149,7 @@ void setup() {
   // Got ok data, print it out!
   Serial.print("Found chip PN5"); Serial.println((versiondata>>24) & 0xFF, HEX);
   Serial.print("Firmware ver. "); Serial.print((versiondata>>16) & 0xFF, DEC);
-  Serial.print('.'); Serial.println((versiondata>>8) & 0xFF, DEC);
+  Serial.print('.'); Serial.println((versiondata>>8) & 0xFF, DEC);*/
 }
 
 /*****************************************/
@@ -164,7 +164,7 @@ void loop() {
   if (alarm == false){ // Alarm deactivated only reads the keypad and the sensor
     readKeypad(0); // 0 If the alarm is deactivated
     if (alarm == false){ //The alarm continues deactivated so read the RFID
-      cardDetected = readRFID();
+      /*cardDetected = readRFID();
       if (cardDetected){
         if (uidLength == storedUIDLength && memcmp(uid, storedUID, uidLength) == 0){
           activateAlarm();
@@ -175,7 +175,7 @@ void loop() {
           alarmIncorrectTry();
           Serial.println("Incorrect card, try again with the correct card");
         }
-      }
+      }*/
     }
   }
  
@@ -185,7 +185,7 @@ void loop() {
     // Lets see if the alarm turn off
     readKeypad(1); // 1 if the alarm is actived
     if (alarm == true){ //The alarm continues activated so read the RFID
-      cardDetected = readRFID();
+      /*cardDetected = readRFID();
       if (cardDetected){
         if (uidLength == storedUIDLength && memcmp(uid, storedUID, uidLength) == 0){
           Serial.println("Card validated, alarm desactivated");
@@ -196,7 +196,7 @@ void loop() {
           Serial.println("Incorrect card, try again with the correct card");
           alarmIncorrectTry();
         }
-      }
+      }*/
     }  
   }
 
