@@ -17,27 +17,27 @@ const char* mqttServer = "test.mosquitto.org";  // Uses the Mosquitto public bro
 const int mqttPort = 1883;
 const char* mqttClientId = "mkr1010-client";
 
-const char* alarmOnTopic = "motionDetection/alarmOn";
-const char* alarmOffTopic = "motionDetection/alarmOff";
+const char* alarmOnTopic = "motionDetection/alarmOnTopic";
+const char* alarmOffTopic = "motionDetection/alarmOffTopic";
 
-const char* activeKeypadTopic = "motionDetection/activeKeypad";
-const char* deactiveKeypadTopic = "motionDetection/deactiveKeypad";
-const char* activeRFIDTopic = "motionDetection/activeRFID";
-const char* deactiveRFIDTopic = "motionDetection/deactiveRFID";
-const char* activeDashboardTopic = "motionDetection/activeDashboard";
-const char* deactiveDashboardTopic = "motionDetection/deactiveDashboard";
+const char* activeKeypadTopic = "motionDetection/activeKeypadTopic";
+const char* deactiveKeypadTopic = "motionDetection/deactiveKeypadTopic";
+const char* activeRFIDTopic = "motionDetection/activeRFIDTopic";
+const char* deactiveRFIDTopic = "motionDetection/deactiveRFIDTopic";
+const char* activeDashboardTopic = "motionDetection/activeDashboardTopic";
+const char* deactiveDashboardTopic = "motionDetection/deactiveDashboardTopic";
 
-const char* trie0Topic = "motionDetection/trie0";
-const char* trie1Topic = "motionDetection/trie1";
-const char* trie2Topic = "motionDetection/trie2";
-const char* trie3Topic = "motionDetection/trie3";
+const char* trie0Topic = "motionDetection/trie0Topic";
+const char* trie1Topic = "motionDetection/trie1Topic";
+const char* trie2Topic = "motionDetection/trie2Topic";
+const char* trie3Topic = "motionDetection/trie3Topic";
 
-const char* intruderTopic = "motionDetection/intruder";
+const char* intruderTopic = "motionDetection/intruderTopic";
 
-const char* microwaveSensorTopic = "motionDetection/microwaveSensor";
-const char* esp32camTopic = "motionDetection/esp32cam";
-const char* ultrasonicSensorTopic = "motionDetection/ultrasonicSensor";
-const char* infraredSensorTopic = "motionDetection/infraredSensor";
+const char* microwaveSensorTopic = "motionDetection/microwaveSensorTopic";
+const char* esp32camTopic = "motionDetection/esp32camTopic";
+const char* ultrasonicSensorTopic = "motionDetection/ultrasonicSensorTopic";
+const char* infraredSensorTopic = "motionDetection/infraredSensorTopic";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -66,7 +66,7 @@ float US_range = 10.0;
 /******** Variables for infrared sensor ********/
 const int infraredPin = A5; // Sensor is connected to the analog A0
 int IR_distance; //Sensor result
-int IR_range = 75; //Diference between distance change
+int IR_range = 50; //Diference between distance change
 int IR_wall; //Original distance
 
 /******** Variables for the keypad ********/
@@ -114,7 +114,6 @@ void setup() {
   pinMode(echoPin, INPUT);
   digitalWrite(triggerPin, LOW);
   delayMicroseconds(2);
-  Serial.println("Line 128");
   
   // Connect to Wi-Fi
   WiFi.begin(ssid, pass);
@@ -169,7 +168,7 @@ void loop() {
  
   else{ // The alarm is active
     readUltrasonic();
-    readInfrared();
+    //readInfrared();
     // Lets see if the alarm turn off
     readKeypad(1); // 1 if the alarm is actived
     if (alarm == true){ //The alarm continues activated so read the RFID
@@ -360,6 +359,8 @@ void readUltrasonic(){
 
 void readInfrared(){
   IR_distance = analogRead(infraredPin); //Get sensor value
+  Serial.print("Value measure with the IR sensor = ");
+  Serial.println(IR_distance);
   if (IR_distance > (IR_wall+IR_range) || IR_distance < (IR_wall-IR_range)){
     Serial.print("Intruder detected on the infrared sensor at = ");
     Serial.println(IR_distance);
