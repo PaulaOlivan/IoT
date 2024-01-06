@@ -1,3 +1,5 @@
+#include <ArduinoIoTCloud.h>
+#include <Arduino_ConnectionHandler.h>
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_PN532.h>
@@ -8,6 +10,18 @@
 #define PN532_IRQ   (2)
 #define PN532_RESET (3)  // Not connected by default on the NFC Shield
 
+/******** Variables for the IoT Cloud conection ********/
+const char THING_ID[] = "Home_Alarm_v2";
+
+String activation_Way;
+bool alarm;
+int tries;
+bool intruder;
+bool cam_Detection;
+bool infrared_Detection;
+bool microwave_Detection;
+bool ultrasonic_Detection;
+
 /******** Variables for the MQTT server ********/
 //char ssid[] = "COSMOTE-166950";
 //char pass[] = "52752766413729464236";
@@ -17,27 +31,10 @@ const char* mqttServer = "test.mosquitto.org";  // Uses the Mosquitto public bro
 const int mqttPort = 1883;
 const char* mqttClientId = "mkr1010-client";
 
-const char* alarmOnTopic = "motionDetection/alarmOnTopic";
-const char* alarmOffTopic = "motionDetection/alarmOffTopic";
-
-const char* activeKeypadTopic = "motionDetection/activeKeypadTopic";
-const char* deactiveKeypadTopic = "motionDetection/deactiveKeypadTopic";
-const char* activeRFIDTopic = "motionDetection/activeRFIDTopic";
-const char* deactiveRFIDTopic = "motionDetection/deactiveRFIDTopic";
-const char* activeDashboardTopic = "motionDetection/activeDashboardTopic";
-const char* deactiveDashboardTopic = "motionDetection/deactiveDashboardTopic";
-
-const char* trie0Topic = "motionDetection/trie0Topic";
-const char* trie1Topic = "motionDetection/trie1Topic";
-const char* trie2Topic = "motionDetection/trie2Topic";
-const char* trie3Topic = "motionDetection/trie3Topic";
-
-const char* intruderTopic = "motionDetection/intruderTopic";
-
-const char* microwaveSensorTopic = "motionDetection/microwaveSensorTopic";
-const char* esp32camTopic = "motionDetection/esp32camTopic";
-const char* ultrasonicSensorTopic = "motionDetection/ultrasonicSensorTopic";
-const char* infraredSensorTopic = "motionDetection/infraredSensorTopic";
+const char* microwaveSensorTopic = "motionDetection/microwaveSensor";
+const char* esp32camTopic = "motionDetection/esp32cam";
+const char* ultrasonicSensorTopic = "motionDetection/ultrasonicSensor";
+const char* infraredSensorTopic = "motionDetection/infraredSensor";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -66,7 +63,7 @@ float US_range = 10.0;
 /******** Variables for infrared sensor ********/
 const int infraredPin = A5; // Sensor is connected to the analog A0
 int IR_distance; //Sensor result
-int IR_range = 50; //Diference between distance change
+int IR_range = 75; //Diference between distance change
 int IR_wall; //Original distance
 
 /******** Variables for the keypad ********/
@@ -90,10 +87,7 @@ static int pos = 0;
 
 /******** Variables for the buzzer and LED ********/
 const int buzzerPin = 7; //buzzer to arduino digital pin 6
-const int ledPin = A6;
-bool alarm = false; // false = non active || true = active
-bool intruder = false; // false = any intruder || true = a intruder
-int tries = 0;
+const int ledPin = A6; 
 
 /*****************************************/
 void setup() {
@@ -101,8 +95,25 @@ void setup() {
   Serial.begin(9600);
   delay(1500);
   while (!Serial) delay(10);
-  keypad.addEventListener(keypadEvent); //add an event listener for this keypad 
+  keypad.addEventListener(keypadEvent); //add an event listener for this keypad
+  alarm  = false; // false = non active || true = active
+  intruder = false; // false = any intruder || true = a intruder
+  tries = 0;
 
+  // Connect to Arduino IoT Cloud
+  ArduinoCloud.begin(ssid, pass);
+  
+  // Define the Thing Properties
+  initProperties();
+  
+  
+  /* The following function allows you to obtain more information related to the state 
+  of network and IoT Cloud connection and errors the higher number the more granular
+  information you’ll get. The default is 0 (only errors). Maximum is 4 */
+
+  setDebugMessageLevel(2);
+  ArduinoCloud.printDebugInfo();
+  
   // Setup for the alarm's sound system
   pinMode(buzzerPin, OUTPUT); // Set buzzer - pin D6 as an output
   digitalWrite(buzzerPin, HIGH); // Deactivated the buzzer pin
@@ -143,6 +154,8 @@ void setup() {
 
 /*****************************************/
 void loop() {
+  ArduinoCloud.update();
+  
   if (!client.connected()) {
     reconnect();
   }
@@ -154,13 +167,13 @@ void loop() {
       cardDetected = readRFID();
       if (cardDetected){
         if (uidLength == storedUIDLength && memcmp(uid, storedUID, uidLength) == 0){
-          Serial.println("Card validated, alarm activated");
-          client.publish(activeRFIDTopic, "1");
           activateAlarm();
+          Serial.println("Card validated, alarm activated");
+          activation_Way = "Activated via RFID card";
         }
         else{ //The card set closer is not correct
-          Serial.println("Incorrect card, try again with the correct card");
           alarmIncorrectTry();
+          Serial.println("Incorrect card, try again with the correct card");
         }
       }
     }
@@ -168,7 +181,7 @@ void loop() {
  
   else{ // The alarm is active
     readUltrasonic();
-    //readInfrared();
+    readInfrared();
     // Lets see if the alarm turn off
     readKeypad(1); // 1 if the alarm is actived
     if (alarm == true){ //The alarm continues activated so read the RFID
@@ -176,7 +189,7 @@ void loop() {
       if (cardDetected){
         if (uidLength == storedUIDLength && memcmp(uid, storedUID, uidLength) == 0){
           Serial.println("Card validated, alarm desactivated");
-          client.publish(deactiveRFIDTopic, "1");
+          activation_Way = "Deactivated via RFID card";
           desactivateAlarm();
         }
         else{ //The card set closer is not correct
@@ -186,6 +199,35 @@ void loop() {
       }
     }  
   }
+
+  ArduinoCloud.update();
+}
+
+/****** Function for inicialize Arduino IoT Cloud ******/
+void initProperties() {
+  ArduinoCloud.setThingId(THING_ID);
+  ArduinoCloud.addProperty(activation_Way, READ, NULL);
+  ArduinoCloud.addProperty(alarm, READWRITE, ON_CHANGE, onAlarmChange);
+  ArduinoCloud.addProperty(tries, READ, NULL);
+  ArduinoCloud.addProperty(intruder, READ, NULL);
+  ArduinoCloud.addProperty(cam_Detection, READ, NULL);
+  ArduinoCloud.addProperty(infrared_Detection, READ, NULL);
+  ArduinoCloud.addProperty(microwave_Detection, READ, NULL);
+  ArduinoCloud.addProperty(ultrasonic_Detection, READ, NULL);
+}
+
+/****** Functions for the IoT Cloud dashboard ******/
+void onAlarmChange() {
+  if (alarm) {
+    activation_Way = "Activated via dashboard";
+    activateAlarm();
+  } 
+  else {
+    desactivateAlarm();
+    activation_Way = "Deactivated via dashboard";
+  }
+
+  ArduinoCloud.update();
 }
 
 /****** Functions related to turning the alarm on and off ******/ 
@@ -224,10 +266,7 @@ bool readRFID() {
 /****** Functions related with the alarm and buzzer ******/
 void activateAlarm(){
   alarm = true;
-  client.publish(alarmOnTopic, "1");
   tries = 0; //Reset tries if we active the alarm
-  client.publish(trie0Topic, "1");
-
   digitalWrite(buzzerPin, LOW); // 1 large tone
   digitalWrite(ledPin, HIGH);
   delay(500);
@@ -254,10 +293,7 @@ void activateAlarm(){
 
 void desactivateAlarm(){
   alarm = false;
-  client.publish(alarmOffTopic, "1");
   tries = 0;
-  client.publish(trie0Topic, "1");
-
   for (int i=0; i<2; i++){ //2 normal tones
     digitalWrite(buzzerPin, LOW);
     digitalWrite(ledPin, HIGH);
@@ -278,17 +314,9 @@ void desactivateAlarm(){
 void alarmIncorrectTry(){
   tries++;
   if (tries >= 3){ //Maximum number of attempts reached
-    client.publish(trie3Topic, "1");
     intruderDetected();
   }
   else{
-    if (tries == 1){
-      client.publish(trie1Topic, "1");
-    }
-    else if (tries == 2){
-      client.publish(trie2Topic, "1");
-    }
-
     digitalWrite(buzzerPin, LOW); //turn on the buzzer
     digitalWrite(ledPin, HIGH); // turn on the led
     delay(1500);
@@ -299,7 +327,6 @@ void alarmIncorrectTry(){
 
 void intruderDetected(){
   intruder = true;
-  client.publish(intruderTopic, "1");
   for (int i=0; i<10; i++){ //10 normal tones
       digitalWrite(buzzerPin, LOW);
       digitalWrite(ledPin, HIGH);
@@ -352,15 +379,17 @@ void readUltrasonic(){
   }
 
   microwave = 0;
+  microwave_Detection = false;
   cam = 0;
+  cam_Detection = false;
   ultrasonic = 0;
+  ultrasonic_Detection = false;
   infrared = 0;
+  infrared_Detection = false;
 }
 
 void readInfrared(){
   IR_distance = analogRead(infraredPin); //Get sensor value
-  Serial.print("Value measure with the IR sensor = ");
-  Serial.println(IR_distance);
   if (IR_distance > (IR_wall+IR_range) || IR_distance < (IR_wall-IR_range)){
     Serial.print("Intruder detected on the infrared sensor at = ");
     Serial.println(IR_distance);
@@ -374,9 +403,13 @@ void readInfrared(){
   }
   
   microwave = 0;
+  microwave_Detection = false;
   cam = 0;
+  cam_Detection = false;
   ultrasonic = 0;
+  ultrasonic_Detection = false;
   infrared = 0;
+  infrared_Detection = false;
 }
 
 /********* Functions for the Keypad *********/
@@ -401,12 +434,12 @@ void comparePasswords(int alarmValue) {
   }
   if (pass_equal && alarmValue == 0) {
     Serial.println("Password validated, alarm activated");
-    client.publish(activeKeypadTopic, "1");
+    activation_Way = "Activated via keypad password";
     activateAlarm();
   }
   else if (pass_equal && alarmValue == 1){
     Serial.println("Password validated, alarm desactivated");
-    client.publish(deactiveKeypadTopic, "1");
+    activation_Way = "Deactivated via keypad password";
     desactivateAlarm();
   }
   else {
@@ -439,25 +472,11 @@ void reconnect() {
       Serial.println("Connected to MQTT");
 
       // Subscribe to specified topics
-      client.subscribe(alarmOnTopic);
-      client.subscribe(alarmOffTopic);
-      client.subscribe(activeKeypadTopic);
-      client.subscribe(deactiveKeypadTopic);
-      client.subscribe(activeRFIDTopic);
-      client.subscribe(deactiveRFIDTopic);
-      client.subscribe(activeDashboardTopic);
-      client.subscribe(deactiveDashboardTopic);
-      client.subscribe(trie0Topic);
-      client.subscribe(trie1Topic);
-      client.subscribe(trie2Topic);
-      client.subscribe(trie3Topic);
-      client.subscribe(intruderTopic);
       client.subscribe(microwaveSensorTopic);
       client.subscribe(esp32camTopic);
       client.subscribe(ultrasonicSensorTopic);
       client.subscribe(infraredSensorTopic);
-    }
-    else {
+    } else {
       Serial.print("Failed, rc=");
       Serial.print(client.state());
       Serial.println(" Retrying in 5 seconds...");
@@ -470,6 +489,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   if (String(topic).equals(String(microwaveSensorTopic))) {
     microwave = 1;
+    microwave_Detection = true;
     if (alarm == true) { //The alarm is activated
       Serial.println("Intruder detected on the microwave sensor");
       intruderDetected();
@@ -477,6 +497,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   } 
   else if (String(topic).equals(String(esp32camTopic))) {
     cam = 1;
+    cam_Detection = true;
     if(alarm == true){
       Serial.println("Intruder detected on the camera");
       intruderDetected();
@@ -484,18 +505,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
   } 
   else if (String(topic).equals(String(ultrasonicSensorTopic))) {
     ultrasonic = 1;
+    ultrasonic_Detection = true;
     // Send to Andreas microcontroller
   }
   else if (String(topic).equals(String(infraredSensorTopic))) {
     infrared = 1;
+    infrared_Detection = true;
     // Send to Andreas microcontroller
-  }
-  else if (String(topic).equals(String(activeDashboardTopic))){
-    Serial.println("Dashboard used, alarm activated");
-    activateAlarm();
-  }
-  else if (String(topic).equals(String(deactiveDashboardTopic))){
-    Serial.println("Dashboard used, alarm desactivated");
-    desactivateAlarm();
   }
 }
